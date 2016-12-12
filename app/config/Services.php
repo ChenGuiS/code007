@@ -6,7 +6,7 @@ use Phalcon\Mvc\Dispatcher;
 use Phalcon\Mvc\Url as UrlProvider;
 use Phalcon\Mvc\View\Engine\Volt as VoltEngine;
 use Phalcon\Mvc\Model\Metadata\Memory as MetaData;
-use Phalcon\Session\Adapter\Files as SessionAdapter;
+use Phalcon\Session\Adapter\Libmemcached as SessionAdapter;
 use Phalcon\Flash\Session as FlashSession;
 use Phalcon\Events\Manager as EventsManager;
 
@@ -102,22 +102,26 @@ class Services extends \Base\Services
      */
     protected function initSession()
     {
-        $session = new SessionAdapter();
+        $config = $this->get('config')->get('libmemcached');
+
+        $session = new SessionAdapter([
+            'servers' => [
+                [
+                    'host'   => $config->host,
+                    'port'   => $config->port,
+                    'weight' => $config->weight
+                ],
+            ],
+            'client' => [
+                \Memcached::OPT_HASH       => \Memcached::HASH_MD5,
+                \Memcached::OPT_PREFIX_KEY => $config->client,
+            ],
+            'lifetime' => $config->lifetime,
+            'prefix'   => $config->lifetime
+        ]);
+
         $session->start();
         return $session;
-    }
-
-    /**
-     * Register the flash service with custom CSS classes
-     */
-    protected function initFlash()
-    {
-        return new FlashSession(array(
-            'error' => 'alert alert-danger',
-            'success' => 'alert alert-success',
-            'notice' => 'alert alert-info',
-            'warning' => 'alert alert-warning'
-        ));
     }
 
     /**
@@ -131,28 +135,16 @@ class Services extends \Base\Services
     /**
      * router
      */
-    // protected function initRouter()
-    // {
-    //     $router = new Phalcon\Mvc\Router();
-//         echo '<pre/>';
-//         $oReflectionClass = new ReflectionClass($router);
-// ReflectionClass->getProperty
-//         $a = $oReflectionClass->getProperty('_routes');
-//         $a->setAccessible(true);
-//         var_dump($a->getValue($router));exit();
-        // $router->add("#^/([\w0-9\_\-]+)/([\w0-9\_]+)\.html(/.*)*$#u", [
-        //     "controller" => 1,
-        //     "action"     => 2,
-        //     "params"     => 3
-        // ]);
-        // preg_match("#^/([\\w0-9\\_\\-]+)/([\\w0-9\\_]+)(\\.html)*(/.*)*$#u", '/contact/index', $ad);
-        // var_dump($ad);exit;
-        // return $router;
-        // $router->add(
-        //     '/documentation/{chapter}/{name}\.{type:[a-z]+}',
-        //     [
-        //      'controller' => 'documentation',
-        //      'action'     => 'show'
-        // )
-    // }
+    protected function initRouter()
+    {
+        $router = new Phalcon\Mvc\Router(false);
+
+        $router->add("#^/([\\w0-9\\_\\-]+)/([\\w0-9\\_]+)\\.html(/.*)*$#u", [
+            "controller" => 1,
+            "action"     => 2,
+            "params"     => 3
+        ]);
+
+        return $router;
+    }
 }
